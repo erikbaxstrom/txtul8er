@@ -29,7 +29,7 @@ Adafruit_MPR121 cap = Adafruit_MPR121();
 
 // Keeps track of the last pins touched
 // so we know when buttons are 'released'
-uint16_t lasttouched = 0;
+// uint16_t lasttouched = 0;
 uint16_t currtouched = 0;
 
 
@@ -82,6 +82,8 @@ void loop() {
   // Read cap touch stuff
   // Get the currently touched pads
   currtouched = cap.touched();
+
+  looper.setTaps(currtouched);
   
   // // Deal with touch and release of pads DONT NEED
   // for (uint8_t i=0; i<12; i++) {

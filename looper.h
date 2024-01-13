@@ -17,7 +17,10 @@ class Looper {
         _play_head[i] = _rec_head + (i + 1) * _buffer_length / (_head_count + 1); 
       }
     }
-  
+
+    void setTaps(uint8_t touched){
+      _touched = touched;
+    }
 
     float Process(float in) {
       // Record to the buffer
@@ -30,7 +33,9 @@ class Looper {
       _output = 0;
       for(int i = 0; i < _head_count; i++){
         // _play_head[i] = (_rec_head - _delaySamples[i]) % _buffer_length;
-        _output += _buffer[_play_head[i]];
+        if(_touched & 1 << i){
+          _output += _buffer[_play_head[i]];
+        }
         _play_head[i]++;
         _play_head[i] %= _buffer_length;
         // _output[i] = _buffer[_play_head[i]] + in;}
@@ -49,7 +54,7 @@ class Looper {
 
     size_t _buffer_length = 0;
 
-    
+    uint8_t _touched = 0;
 
     static const int _head_count = 4;
     size_t _play_head[_head_count] = {0}; 
