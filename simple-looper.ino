@@ -16,7 +16,7 @@ static const int pitch_pin       = A(S33);
 static const float kKnobMax = 1023;
 
 // Allocate buffer in SDRAM 
-static const uint32_t kBufferLengthSec = 5;
+static const uint32_t kBufferLengthSec = 10;
 static const uint32_t kSampleRate = 48000;
 static const size_t kBufferLenghtSamples = kBufferLengthSec * kSampleRate;
 static float DSY_SDRAM_BSS buffer[kBufferLenghtSamples];
@@ -35,17 +35,18 @@ uint16_t currtouched = 0;
 
 
 void AudioCallback(float **in, float **out, size_t size) {
-  // for (size_t i = 0; i < size; i++) {
-  //   auto looper_out = looper.Process(in[1][i]);
-  //   out[0][i] = out[1][i] = pitch_shifter.Process(looper_out);
-  // }
-  // mix 
   for (size_t i = 0; i < size; i++) {
     auto looper_out = looper.Process(in[1][i]);
-    float pitch_shifter_out = pitch_shifter.Process(looper_out);
-    float mix = ( in[1][i] + pitch_shifter_out ) * 0.707;
-    out[0][i] = out[1][i] = mix;
+    auto shifted = pitch_shifter.Process(looper_out);
+    out[0][i] = out[1][i] = looper_out;
   }
+  // mix 
+  // for (size_t i = 0; i < size; i++) {
+  //   auto looper_out = looper.Process(in[0][i]);
+  //   float pitch_shifter_out = pitch_shifter.Process(looper_out);
+  //   float mix = ( in[1][i] + pitch_shifter_out ) * 0.707;
+  //   out[0][i] = out[1][i] = mix;
+  // }
   
 }
 
@@ -99,13 +100,14 @@ void loop() {
 
 
 
-  // Set loop parameters by analog reading pot values DONT NEED
-  // auto loop_start = fmap(analogRead(loop_start_pin) / kKnobMax, 0.f, 1.f);
-  // auto loop_length = fmap(analogRead(loop_length_pin) / kKnobMax, 0.f, 1.f, Mapping::EXP);
+  // // Set loop parameters by analog reading pot values DONT NEED
+  // // auto loop_start = fmap(analogRead(loop_start_pin) / kKnobMax, 0.f, 1.f);
+  // // auto loop_length = fmap(analogRead(loop_length_pin) / kKnobMax, 0.f, 1.f, Mapping::EXP);
+  // // looper.SetLoop(loop_start, loop_length);
+  // //this is code I wrote. probably dont need this either
+  // auto loop_start = 0;
+  // auto loop_length = 1;
   // looper.SetLoop(loop_start, loop_length);
-  auto loop_start = 0;
-  auto loop_length = 1;
-  looper.SetLoop(loop_start, loop_length);
 
   // Toggle record from touchpad 0 DONT NEED
   // auto record_on = digitalRead(record_pin);
@@ -116,8 +118,8 @@ void loop() {
   // looper.SetRecording(record_on);
 
   // always be recording
-  auto record_on = true;
-  looper.SetRecording(record_on);
+  // auto record_on = true;
+  // looper.SetRecording(record_on);
 
   // Set pitch
   auto pitch_val = fmap(analogRead(pitch_pin) / kKnobMax, 0.f, 1.f);
