@@ -35,18 +35,18 @@ uint16_t currtouched = 0;
 
 
 void AudioCallback(float **in, float **out, size_t size) {
+  // for (size_t i = 0; i < size; i++) {
+  //   auto looper_out = looper.Process(in[1][i]);
+  //   auto shifted = pitch_shifter.Process(looper_out);
+  //   out[0][i] = out[1][i] = looper_out;
+  // }
+  // mix 
   for (size_t i = 0; i < size; i++) {
     auto looper_out = looper.Process(in[1][i]);
-    auto shifted = pitch_shifter.Process(looper_out);
-    out[0][i] = out[1][i] = looper_out;
+    float pitch_shifter_out = pitch_shifter.Process(looper_out);
+    float mix = ( in[1][i] + pitch_shifter_out ) * 0.707;
+    out[0][i] = out[1][i] = mix;
   }
-  // mix 
-  // for (size_t i = 0; i < size; i++) {
-  //   auto looper_out = looper.Process(in[0][i]);
-  //   float pitch_shifter_out = pitch_shifter.Process(looper_out);
-  //   float mix = ( in[1][i] + pitch_shifter_out ) * 0.707;
-  //   out[0][i] = out[1][i] = mix;
-  // }
   
 }
 
