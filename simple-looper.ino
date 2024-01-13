@@ -8,15 +8,15 @@
 #endif
 
 // Setup pins
-static const int record_pin      = D(S30);
-static const int loop_start_pin  = A(S31);
+static const int mix_control_pin = A(S30);
+static const int grain_env_pin   = A(S31);
 static const int loop_length_pin = A(S32);
 static const int pitch_pin       = A(S33);
 
 static const float kKnobMax = 1023;
 
 // Allocate buffer in SDRAM 
-static const uint32_t kBufferLengthSec = 10;
+static const uint32_t kBufferLengthSec = 6;
 static const uint32_t kSampleRate = 48000;
 static const size_t kBufferLenghtSamples = kBufferLengthSec * kSampleRate;
 static float DSY_SDRAM_BSS buffer[kBufferLenghtSamples];
@@ -41,10 +41,11 @@ void AudioCallback(float **in, float **out, size_t size) {
   //   out[0][i] = out[1][i] = looper_out;
   // }
   // mix 
+  auto mix_control = fmap(analogRead(mix_control_pin) / kKnobMax, 0.f, 1.f);
   for (size_t i = 0; i < size; i++) {
     auto looper_out = looper.Process(in[1][i]);
     float pitch_shifter_out = pitch_shifter.Process(looper_out);
-    float mix = ( in[1][i] + pitch_shifter_out ) * 0.707;
+    float mix = ( mix_control * in[1][i] + (1 - mix_control) * pitch_shifter_out ) * 0.707;
     out[0][i] = out[1][i] = mix;
   }
   
@@ -61,7 +62,7 @@ void setup() {
   pitch_shifter.Init(sample_rate);
 
   // Setup pins
-  pinMode(record_pin, INPUT_PULLUP);
+  // pinMode(record_pin, INPUT_PULLUP);
 
   // Setup serial for cap touch debug
     Serial.begin(9600);
@@ -83,8 +84,12 @@ void loop() {
   // Get the currently touched pads
   currtouched = cap.touched();
 
-  looper.setTaps(currtouched);
-  
+
+  auto grain_env = analogRead(grain_env_pin) / kKnobMax;
+  // auto grain_env = fmap(analogRead(grain_env_pin) / kKnobMax, 0.f, 1.f);
+
+  looper.setTaps(currtouched, grain_env);
+
   // // Deal with touch and release of pads DONT NEED
   // for (uint8_t i=0; i<12; i++) {
   //   // it if *is* touched and *wasnt* touched before, alert!
@@ -133,7 +138,7 @@ void set_pitch(float pitch_val) {
   // Allow some gap in the middle of the knob turn so 
   // it's easy to cacth zero position
   if (pitch_val < 0.45 || pitch_val > 0.55) {
-    pitch = 12.0 * (pitch_val - 0.5);
+    pitch = 24.0 * (pitch_val - 0.5);
   }
   pitch_shifter.SetTransposition(pitch);
 }
