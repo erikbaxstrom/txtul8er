@@ -11,8 +11,8 @@
 // Setup pins
 static const int mix_control_pin = A(S30);
 static const int grain_env_pin   = A(S31);
-static const int loop_length_pin = A(S32);
-static const int pitch_pin       = A(S33);
+static const int g_play_speed_pin = A(S32);
+// static const int pan_pin       = A(S33);
 
 static const float kKnobMax = 1023;
 
@@ -25,11 +25,12 @@ static float DSY_SDRAM_BSS buffer[kBufferLengthSamples];
 // grain playback stuff
 unsigned long gCurrentMillis;
 unsigned long gPreviousMillis = 0;
-static const uint32_t gSampleInterval = 100; //milliseconds between samples. 1000 ms = 1 s
+static const uint32_t gSampleIntervalStart = 100;  //milliseconds between samples. 1000 ms = 1 s
 static const uint32_t gBufferLengthSec = 300;
-static const size_t gBufferLengthSamples = gBufferLengthSec * 1000 / gSampleInterval; 
+static const size_t gBufferLengthSamples = gBufferLengthSec * 1000 / gSampleIntervalStart; 
 // static uint16_t DSY_SDRAM_BSS gBuffer[gBufferLengthSamples];
 uint16_t gBuffer[gBufferLengthSamples] = {0};
+uint32_t gSampleInterval = gSampleIntervalStart; 
 
 static const uint16_t grain_rec_button = 10;
 static const uint16_t grain_play_button = 11;
@@ -42,6 +43,7 @@ uint16_t g_read = 0;
 static synthux::Looper looper;
 // static PitchShifter pitch_shifter;
 float mix_control = 0;
+// float pan_control = 0; 
 
 
 Adafruit_MPR121 cap = Adafruit_MPR121();
@@ -102,6 +104,7 @@ void setup() {
 void loop() {
 
   mix_control = fmap(analogRead(mix_control_pin) / kKnobMax, 0.f, 1.f);
+  gSampleInterval = fmap(analogRead(g_play_speed_pin) / kKnobMax, 0.f, 1.f);
   // Read cap touch stuff
   // Get the currently touched pads
   currtouched = cap.touched();
@@ -133,21 +136,21 @@ void loop() {
         grain_is_recording = true; //start recording
       }
       // grain_is_recording = !grain_is_recording;
-      Serial.println("rec toggled");
-      Serial.println(grain_is_recording? "R ": "r "); 
-      Serial.println(grain_is_playing? "P": "q");
-      Serial.println(gBuffer[g_headposition]);
+      // Serial.println("rec toggled");
+      // Serial.println(grain_is_recording? "R ": "r "); 
+      // Serial.println(grain_is_playing? "P": "q");
+      // Serial.println(gBuffer[g_headposition]);
     }
   // set grain playback state
   if ((currtouched & _BV(grain_play_button)) && !(lasttouched & _BV(grain_play_button)) ) {
       // Serial.println(" play toggled");
       grain_is_playing = !grain_is_playing;
       g_read = 0;
-      Serial.println("play toggled");
-      Serial.println(grain_is_recording? "R ": "r "); 
-      Serial.println(grain_is_playing? "P": "q");
-      Serial.println(g_headposition);
-      Serial.println(gBuffer[g_headposition]);
+      // Serial.println("play toggled");
+      // Serial.println(grain_is_recording? "R ": "r "); 
+      // Serial.println(grain_is_playing? "P": "q");
+      // Serial.println(g_headposition);
+      // Serial.println(gBuffer[g_headposition]);
     }
   if((currtouched & _BV(grain_play_button)) && (currtouched & _BV(grain_rec_button))){
     // both touched. erase grain buffer
@@ -155,7 +158,7 @@ void loop() {
     grain_is_playing = false;
     g_headposition = 0;
     gloopend = 0;
-    Serial.println("erased buffer");
+    // Serial.println("erased buffer");
     delay(100);
     //reset
   }
@@ -191,13 +194,13 @@ void loop() {
     // update headposition
   }
   // 'or' together the currtouched and the current grainloop before passing currtouched to setTaps below
-  Serial.print(currtouched);
-  Serial.print(" ");
-  Serial.print(g_read);
+  // Serial.print(currtouched);
+  // Serial.print(" ");
+  // Serial.print(g_read);
   // currtouched = currtouched | g_read;
   currtouched = currtouched | g_read;
-  Serial.print(" ");
-  Serial.println(currtouched);
+  // Serial.print(" ");
+  // Serial.println(currtouched);
 
 
 
