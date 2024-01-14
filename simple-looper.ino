@@ -120,35 +120,45 @@ void loop() {
 
   // read/set play/pause and re cord states from currtouched
   // set grain record state
-  if (!(currtouched & _BV(grain_rec_button)) && (lasttouched & _BV(grain_rec_button)) ) {
+  if ((currtouched & _BV(grain_rec_button)) && !(lasttouched & _BV(grain_rec_button)) ) {
       // Serial.println(" record toggled");
       grain_is_playing = false;
       g_read = 0;
-      grain_is_recording = !grain_is_recording;
+      if(grain_is_recording){ 
+        grain_is_recording = false; //stop recording
+        grain_is_playing = true;    //start playing
+      }
+      else {
+        grain_is_playing = false;  //stop playing
+        grain_is_recording = true; //start recording
+      }
+      // grain_is_recording = !grain_is_recording;
       Serial.println("rec toggled");
       Serial.println(grain_is_recording? "R ": "r "); 
       Serial.println(grain_is_playing? "P": "q");
       Serial.println(gBuffer[g_headposition]);
     }
   // set grain playback state
-  if (!(currtouched & _BV(grain_play_button)) && (lasttouched & _BV(grain_play_button)) ) {
+  if ((currtouched & _BV(grain_play_button)) && !(lasttouched & _BV(grain_play_button)) ) {
       // Serial.println(" play toggled");
       grain_is_playing = !grain_is_playing;
+      g_read = 0;
       Serial.println("play toggled");
       Serial.println(grain_is_recording? "R ": "r "); 
       Serial.println(grain_is_playing? "P": "q");
       Serial.println(g_headposition);
       Serial.println(gBuffer[g_headposition]);
     }
-  // if((currtouched & _BV(grain_play_button)) && (currtouched & _BV(grain_rec_button))){
-  //   // both touched. erase grain buffer
-  //   grain_is_recording = false;
-  //   grain_is_playing = false;
-  //   g_headposition = 0;
-  //   gloopend = 0;
-  //   Serial.println('erased buffer');
-  //   //reset
-  // }
+  if((currtouched & _BV(grain_play_button)) && (currtouched & _BV(grain_rec_button))){
+    // both touched. erase grain buffer
+    grain_is_recording = false;
+    grain_is_playing = false;
+    g_headposition = 0;
+    gloopend = 0;
+    Serial.println("erased buffer");
+    delay(100);
+    //reset
+  }
 
   lasttouched = currtouched;
 
