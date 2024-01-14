@@ -25,10 +25,11 @@ static float DSY_SDRAM_BSS buffer[kBufferLengthSamples];
 // grain playback stuff
 unsigned long gCurrentMillis;
 unsigned long gPreviousMillis = 0;
-static const uint32_t gSampleInterval = 10; //milliseconds between samples. 1000 ms = 1 s
+static const uint32_t gSampleInterval = 100; //milliseconds between samples. 1000 ms = 1 s
 static const uint32_t gBufferLengthSec = 300;
-static const size_t gBufferLengthSamples = gBufferLengthSec * gSampleInterval; // is this right? since switch from 
-static uint16_t DSY_SDRAM_BSS gBuffer[gBufferLengthSamples];
+static const size_t gBufferLengthSamples = gBufferLengthSec * 1000 / gSampleInterval; 
+// static uint16_t DSY_SDRAM_BSS gBuffer[gBufferLengthSamples];
+uint16_t gBuffer[gBufferLengthSamples] = {0};
 
 static const uint16_t grain_rec_button = 10;
 static const uint16_t grain_play_button = 11;
@@ -36,11 +37,11 @@ bool grain_is_recording = false;
 bool grain_is_playing = false;
 size_t g_headposition = 0;
 size_t gloopend = 0;
+uint16_t g_read = 0;
 
 static synthux::Looper looper;
-// static GrainLoop grainloop;
-static PitchShifter pitch_shifter;
-
+// static PitchShifter pitch_shifter;
+float mix_control = 0;
 
 
 Adafruit_MPR121 cap = Adafruit_MPR121();
@@ -59,11 +60,10 @@ void AudioCallback(float **in, float **out, size_t size) {
   //   out[0][i] = out[1][i] = looper_out;
   // }
   // mix 
-  auto mix_control = fmap(analogRead(mix_control_pin) / kKnobMax, 0.f, 1.f);
   for (size_t i = 0; i < size; i++) {
     auto looper_out = looper.Process(in[1][i]);
-    float pitch_shifter_out = pitch_shifter.Process(looper_out);
-    float mix = ( mix_control * in[1][i] + (1 - mix_control) * pitch_shifter_out ) * 0.707;
+    // float pitch_shifter_out = pitch_shifter.Process(looper_out);
+    float mix = ( mix_control * in[1][i] + (1 - mix_control) * looper_out ) * 0.707;
     out[0][i] = out[1][i] = mix;
   }
   
@@ -77,10 +77,10 @@ void setup() {
   looper.Init(buffer, kBufferLengthSamples);
 
   // Setup grainloop
-  // grainloop.Init(gBuffer, gBufferLengthSamples, gSampleInterval);
+  // memset(gBuffer, 0, sizeof(uint16_t) * gBufferLengthSamples);
 
   // Setup pitch shifter
-  pitch_shifter.Init(sample_rate);
+  // pitch_shifter.Init(sample_rate);
 
   // Setup pins
   // pinMode(record_pin, INPUT_PULLUP);
@@ -101,6 +101,7 @@ void setup() {
 
 void loop() {
 
+  mix_control = fmap(analogRead(mix_control_pin) / kKnobMax, 0.f, 1.f);
   // Read cap touch stuff
   // Get the currently touched pads
   currtouched = cap.touched();
@@ -117,11 +118,12 @@ void loop() {
   //   }
   // }
 
-  // read/set play/pause and record states from currtouhed
+  // read/set play/pause and re cord states from currtouched
   // set grain record state
   if (!(currtouched & _BV(grain_rec_button)) && (lasttouched & _BV(grain_rec_button)) ) {
       // Serial.println(" record toggled");
       grain_is_playing = false;
+      g_read = 0;
       grain_is_recording = !grain_is_recording;
       Serial.println("rec toggled");
       Serial.println(grain_is_recording? "R ": "r "); 
@@ -138,6 +140,15 @@ void loop() {
       Serial.println(g_headposition);
       Serial.println(gBuffer[g_headposition]);
     }
+  // if((currtouched & _BV(grain_play_button)) && (currtouched & _BV(grain_rec_button))){
+  //   // both touched. erase grain buffer
+  //   grain_is_recording = false;
+  //   grain_is_playing = false;
+  //   g_headposition = 0;
+  //   gloopend = 0;
+  //   Serial.println('erased buffer');
+  //   //reset
+  // }
 
   lasttouched = currtouched;
 
@@ -149,7 +160,7 @@ void loop() {
     // if recording, write currtouched to buffer at headposition on, update loopend if needed
     if(grain_is_recording){
       // Serial.print(gCurrentMillis); Serial.println('grain is recording');
-      gBuffer[g_headposition] = currtouched & ;
+      gBuffer[g_headposition] = currtouched & 15; //bitwise 'and' w/ 15 to mask out the play/pause buttons
       g_headposition++;
       if(g_headposition > gBufferLengthSamples){ //end of buffer. loop back to beginning of buffer. set gloopend to buffer length
         g_headposition = 0;
@@ -162,7 +173,7 @@ void loop() {
     // if playing, read from buffer at headposition, wrapping at loopend
     if(grain_is_playing){
       // Serial.print(gCurrentMillis); Serial.println('grain is playing');
-      currtouched = currtouched & gBuffer[g_headposition];
+      g_read = gBuffer[g_headposition];
       g_headposition++;
       g_headposition %= gloopend;
     }
@@ -170,7 +181,13 @@ void loop() {
     // update headposition
   }
   // 'or' together the currtouched and the current grainloop before passing currtouched to setTaps below
-
+  Serial.print(currtouched);
+  Serial.print(" ");
+  Serial.print(g_read);
+  // currtouched = currtouched | g_read;
+  currtouched = currtouched | g_read;
+  Serial.print(" ");
+  Serial.println(currtouched);
 
 
 
@@ -216,17 +233,17 @@ void loop() {
   // auto record_on = true;
   // looper.SetRecording(record_on);
 
-  // Set pitch
-  auto pitch_val = fmap(analogRead(pitch_pin) / kKnobMax, 0.f, 1.f);
-  set_pitch(pitch_val);
-}
+//   // Set pitch
+//   auto pitch_val = fmap(analogRead(pitch_pin) / kKnobMax, 0.f, 1.f);
+//   set_pitch(pitch_val);
+// }
 
-void set_pitch(float pitch_val) {
-  int pitch = 0;
-  // Allow some gap in the middle of the knob turn so 
-  // it's easy to cacth zero position
-  if (pitch_val < 0.45 || pitch_val > 0.55) {
-    pitch = 24.0 * (pitch_val - 0.5);
-  }
-  pitch_shifter.SetTransposition(pitch);
+// void set_pitch(float pitch_val) {
+//   int pitch = 0;
+//   // Allow some gap in the middle of the knob turn so 
+//   // it's easy to cacth zero position
+//   if (pitch_val < 0.45 || pitch_val > 0.55) {
+//     pitch = 24.0 * (pitch_val - 0.5);
+//   }
+//   pitch_shifter.SetTransposition(pitch);
 }
