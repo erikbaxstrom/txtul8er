@@ -6,8 +6,8 @@ A playable, sequenceable granular effects processor.
 
 ## Technologies Used
 
-Daisy Seed Microcontroller
-Synthux Academy Simple Fix Kit
-MPR121 Capacitive Touch Sensor
-Arduino IDE
-C++
+- Daisy Seed Microcontroller
+- Synthux Academy [Simple Fix Kit](https://www.synthux.academy/shop/kit-simple-fix)
+- [MPR121](https://www.adafruit.com/product/1982) Capacitive Touch Sensor
+- Arduino IDE
+- C++
