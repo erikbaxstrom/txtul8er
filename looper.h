@@ -28,7 +28,9 @@ class Looper {
           _envelope[i] -= _env_step;
         }
 
+      }
     }
+
 
     float Process(float in) {
       // Record to the buffer
