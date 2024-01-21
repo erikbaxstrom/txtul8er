@@ -9,108 +9,66 @@ class Looper {
     void Init(float *buf, size_t length) {
       _buffer = buf;
       _buffer_length = length;
-      // Reset buffer contents to zero
+            // Reset buffer contents to zero
       memset(_buffer, 0, sizeof(float) * _buffer_length);
-    }
-
-    void SetRecording(bool is_rec_on) {
-        // TODO: figure out if I need this
-        //Initialize recording head position on start
-        if (_rec_env_pos_inc <= 0 && is_rec_on) {
-            _rec_head = (_loop_start + _play_head) % _buffer_length; 
-            _is_empty = false;
-        }
-        // When record switch changes state it effectively
-        // sets ramp to rising/falling, providing a
-        // fade in/out in the beginning and at the end of 
-        // the recorded region.
-        _rec_env_pos_inc = is_rec_on ? 1 : -1;
-    }
-
-
-    void SetLoop(const float loop_start, const float loop_length) {
-      // TODO: figure out if I need this
-      // Set the start of the next loop
-      _pending_loop_start = static_cast<size_t>(loop_start * (_buffer_length - 1));
-
-      // If the current loop start is not set yet, set it too
-      if (!_is_loop_set) _loop_start = _pending_loop_start;
-
-      // Set the length of the next loop
-      _pending_loop_length = max(kMinLoopLength, static_cast<size_t>(loop_length * _buffer_length));
-
-      //If the current loop length is not set yet, set it too
-      if (!_is_loop_set) _loop_length = _pending_loop_length;
-      _is_loop_set = true;
-    }
-  
-    float Process(float in) {
-      // Calculate iterator position on the record level ramp. TODO: probs delete this. always recording
-      if (_rec_env_pos_inc > 0 && _rec_env_pos < kFadeLength
-       || _rec_env_pos_inc < 0 && _rec_env_pos > 0) {
-          _rec_env_pos += _rec_env_pos_inc;
+      // Setup the playheads
+      for(int i = 0; i < _grain_count; i++){
+        _grain_pos[i] = _rec_head + (i + 1) * _buffer_length / (_grain_count + 1); 
       }
-      // If we're in the middle of the ramp - record to the buffer. TODO: no ifs. always record
-      if (_rec_env_pos > 0) {
-        // Calculate fade in/out
-        float rec_attenuation = static_cast<float>(_rec_env_pos) / static_cast<float>(kFadeLength);
-        _buffer[_rec_head] = in * rec_attenuation + _buffer[_rec_head] * (1.f - rec_attenuation);
-        _rec_head ++;
-        _rec_head %= _buffer_length;
-      }
+    }
+
+    void setTaps(uint8_t touched, const float grain_env){
+      _env_step = fmap(grain_env, _min_env_step, _max_env_step);
       
-      if (_is_empty) {
-        return 0;
+      for (uint8_t i = 0; i < _grain_count; i++){
+        if(touched & 1 << i && _envelope[i] < _env_range){
+          _envelope[i] += _env_step;
+        }
+        else if (!(touched & 1 << i) && _envelope[i] > 0){
+          _envelope[i] -= _env_step;
+        }
+
       }
+    }
+
+
+    float Process(float in) {
+      // Record to the buffer
+      _buffer[_rec_head] = in;
+      _rec_head++;
+      _rec_head %= _buffer_length;
 
       // Playback from the buffer
-      float attenuation = 1;
-      float output = 0;
-      //Calculate fade in/out
-      if (_play_head < kFadeLength) {
-        attenuation = static_cast<float>(_play_head) / static_cast<float>(kFadeLength);
-      }
-      else if (_play_head >= _loop_length - kFadeLength) {
-        attenuation = static_cast<float>(_loop_length - _play_head) / static_cast<float>(kFadeLength);
-      }
-      
-      // Read from the buffer
-      static const uint32_t delaySec = 2;
-      static const uint32_t kSampleRate = 48000;
-      static const size_t delaySamples = delaySec * kSampleRate;
-      auto play_pos = (_loop_start + _play_head - delaySamples) % _buffer_length;
-      // auto play_pos = (_rec_head - delaySamples) % _buffer_length;
-      output = _buffer[play_pos] * attenuation;
+      _output = 0;
+      for(int i = 0; i < _grain_count; i++){
+        _output += _buffer[_grain_pos[i]] * _envelope[i] / _env_range;
+        _grain_pos[i]++;
+        _grain_pos[i] %= _buffer_length;
+        }
+      _output = _output * sqrt(_grain_count);
+      return _output;
 
-      // Advance playhead
-      _play_head ++;
-      if (_play_head >= _loop_length) {
-        _loop_start = _pending_loop_start;
-        _loop_length = _pending_loop_length;
-        _play_head = 0;
-      }
-      
-      return output * attenuation;
     }
 
   private:
-    static const size_t kFadeLength = 600;
-    static const size_t kMinLoopLength = 2 * kFadeLength;
 
     float* _buffer;
 
-    size_t _buffer_length       = 0;
-    size_t _loop_length         = 0;
-    size_t _pending_loop_length = 0;
-    size_t _loop_start          = 0;
-    size_t _pending_loop_start  = 0;
+    size_t _buffer_length = 0;
 
-    size_t _play_head = 0;
+    static const int _grain_count = 4;
+    size_t _grain_pos[_grain_count] = {0}; 
     size_t _rec_head  = 0;
 
-    size_t _rec_env_pos      = 0;
-    int32_t _rec_env_pos_inc = 0;
+    int _envelope[_grain_count] = {0};
+    static const int _min_env_step = 2;
+    static const int _max_env_step = 100;
+    static const int _env_range = 1000;
+
+    float _env_step = _min_env_step;
+
+    float _output = 0;
+    float _mix = sqrt(_grain_count);
     bool _is_empty  = true;
-    bool _is_loop_set = false;
 };
 };
